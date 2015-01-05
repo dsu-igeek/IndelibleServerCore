@@ -22,6 +22,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.rmi.RemoteException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -67,6 +70,7 @@ public class EntityAuthenticationServerCore extends IndelibleEntity implements E
     private PrivateKey signingKey;
     private KeyStore keyStore;
     private X509Certificate rootCertificate;
+    private SocketAddress serverAddress;
     
     private static final String kRootCertAlias = "IndelibleRootCert";
     private static final String kDefaultKeyStorePassword = "idb301$";
@@ -126,7 +130,9 @@ public class EntityAuthenticationServerCore extends IndelibleEntity implements E
      * @see com.igeekinc.indelible.indeliblefs.security.SecurityServer#authenticateServer(com.igeekinc.indelible.oid.ServerID, java.security.PublicKey)
      */
     public EntityAuthentication authenticateServer(EntityID serverID, byte [] encodedCertReq) 
-    throws CertificateEncodingException, InvalidKeyException, IllegalStateException, NoSuchProviderException, NoSuchAlgorithmException, SignatureException, UnrecoverableKeyException, KeyStoreException, IOException, CertificateParsingException
+    throws CertificateEncodingException, InvalidKeyException, IllegalStateException, NoSuchProviderException, 
+    NoSuchAlgorithmException, SignatureException, UnrecoverableKeyException, KeyStoreException, IOException, 
+    CertificateParsingException, ServerNotRegisteredException, AuthenticationFailureException
     {
         Date startDate = new Date(System.currentTimeMillis() - (60L * 60L * 1000L));              // time from which certificate is valid
         Date expiryDate = new Date(startDate.getTime() + (30L * 24L * 60L * 60L * 1000L));             // time after which certificate is not valid
@@ -164,7 +170,22 @@ public class EntityAuthenticationServerCore extends IndelibleEntity implements E
                     X509Certificate cert = certGen.generate(signingKey, "BC");
                     returnAuthentication = new EntityAuthentication(cert);
                 }
+                else
+                {
+                	logger.error(new ErrorLogMessage("Server {0} requesting authentication, but registered key does not match", serverID));
+                	throw new AuthenticationFailureException();
+                }
             }
+            else
+            {
+            	logger.error(new ErrorLogMessage("Server {0} requesting authentication, no check key found in registered certificate", serverID));
+            	throw new AuthenticationFailureException();
+            }
+        }
+        else
+        {
+        	logger.error(new ErrorLogMessage("Server {0} requesting authentication, but not registered", serverID));
+        	throw new ServerNotRegisteredException();
         }
         return returnAuthentication;
     }
@@ -267,4 +288,52 @@ public class EntityAuthenticationServerCore extends IndelibleEntity implements E
         }
         throw new InternalError("Could not generate signing signature");
     }
+
+
+
+	@Override
+	public SocketAddress getServerAddress() throws RemoteException
+	{
+		if (serverAddress == null)
+			throw new InternalError("serverAddress has not been set");
+		return serverAddress;
+	}
+
+
+
+	public void setServerAddress(InetSocketAddress serverAddress)
+	{
+		if (serverAddress == null)
+			throw new IllegalArgumentException("serverAddress cannot be null");
+		this.serverAddress = serverAddress;
+	}
+	
+	public String toString()
+	{
+		return serverAddress.toString()+" "+getEntityID();
+	}
+
+
+
+	@Override
+	public void close() throws IOException
+	{
+		// no-op for now
+	}
+
+
+
+	@Override
+	public void close(long timeout) throws IOException
+	{
+		// no-op for now
+	}
+
+
+
+	@Override
+	public boolean isClosed()
+	{
+		return false;
+	}
 }

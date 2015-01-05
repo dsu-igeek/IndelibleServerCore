@@ -43,8 +43,12 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 import org.apache.log4j.PropertyConfigurator;
+import org.newsclub.net.unix.AFUNIXSocket;
+import org.newsclub.net.unix.AFUNIXSocketAddress;
 import org.perf4j.log4j.AsyncCoalescingStatisticsAppender;
 
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 import sun.rmi.registry.RegistryImpl;
 import sun.rmi.server.UnicastServerRef;
 
@@ -52,17 +56,17 @@ import com.igeekinc.indelible.indeliblefs.IndelibleEntity;
 import com.igeekinc.indelible.indeliblefs.security.AuthenticationFailureException;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationClient;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationClientListener;
-import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationFirehoseServer;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServer;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerAppearedEvent;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerCore;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerDisappearedEvent;
-import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerFirehoseClient;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerTrustedEvent;
 import com.igeekinc.indelible.indeliblefs.security.EntityAuthenticationServerUntrustedEvent;
 import com.igeekinc.indelible.oid.EntityID;
 import com.igeekinc.indelible.oid.ObjectIDFactory;
 import com.igeekinc.util.MonitoredProperties;
+import com.igeekinc.util.OSType;
+import com.igeekinc.util.SystemInfo;
 import com.igeekinc.util.logging.ErrorLogMessage;
 import com.igeekinc.util.logging.FatalLogMessage;
 import com.igeekinc.util.logging.InfoLogMessage;
@@ -74,17 +78,28 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
     protected Logger logger;
     protected IndelibleServerBonjour bonjour;
     protected EntityAuthenticationServer entityAuthenticationServer;
-    protected EntityAuthenticationFirehoseServer entityAuthenticationFirehoseServer;
     protected DailyRollingFileAppender rollingLog;
     protected DailyRollingFileAppender statsLog, rawLog;	// These are the log files for performance statistics
     protected Registry serverRegistry;
 	protected MonitoredProperties serverProperties;
+	protected int serverPort;
     
     public IndelibleServer()
     {
         logger = Logger.getLogger(this.getClass());
     	bonjour = IndelibleServerBonjour.getIndelibleServerBonjour(this);
-
+    	if (SystemInfo.getSystemInfo().getOSType() != OSType.kWindows)
+    	{
+    		// Everybody except Windows supports USR2
+    		Signal.handle(new Signal("USR2"), new SignalHandler()
+    		{
+    			@Override
+    			public void handle(Signal arg0)
+    			{
+    				dumpServer();
+    			}
+    		});
+    	}
     }
 
     protected abstract boolean shouldCreateRegistry();
@@ -96,14 +111,15 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
     	if (serverProperties.containsKey(IndelibleServerPreferences.kJavaRMIServerHostname))
     		System.getProperties().setProperty(IndelibleServerPreferences.kJavaRMIServerHostname, 
     				serverProperties.getProperty(IndelibleServerPreferences.kJavaRMIServerHostname));
+		String serverPortStr = serverProperties.getProperty(IndelibleServerPreferences.kServerPortPropertyName);
+		serverPort = 0;
+		if (serverPortStr != null)
+		{
+			serverPort = Integer.parseInt(serverPortStr);
+		}
     	if (shouldCreateRegistry())
     	{
-    		String serverPortStr = serverProperties.getProperty(IndelibleServerPreferences.kServerPortPropertyName);
-    		int serverPort = 0;	// Random port
-    		if (serverPortStr != null)
-    		{
-    			serverPort = Integer.parseInt(serverPortStr);
-    		}
+
     		try
     		{
     			createRegistry(serverPort);
@@ -138,8 +154,7 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
     {
         Properties loggingProperties = new Properties();
         loggingProperties.putAll(serverProperties);
-        File additionalLoggingConfigFile = new File(serverProperties.getProperty(IndelibleServerPreferences.kPreferencesDirPropertyName),
-        "executorLoggingOptions.properties"); //$NON-NLS-1$
+        File additionalLoggingConfigFile = getAdditionalLoggingConfigFile(serverProperties);
         Exception savedException = null;
         try
         {
@@ -178,11 +193,10 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
     					logFileEncoding = "utf-16be";
     				else
     					logFileEncoding = "utf-16le";
+    				checkStream.close();
     			} catch (FileNotFoundException e) {
-    				// TODO Auto-generated catch block
     				e.printStackTrace();
     			} catch (IOException e) {
-    				// TODO Auto-generated catch block
     				e.printStackTrace();
     			}
     		}
@@ -420,7 +434,7 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
     {
         try
         {
-            EntityID securityServerID = trustedEvent.getAddedServer().getEntityID();
+            EntityID securityServerID = trustedEvent.getTrustedServer().getEntityID();
 
         } catch (Exception e)
         {
@@ -434,7 +448,7 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
         
     }
 
-    private void createRegistry(int portNumber) throws Exception
+    protected void createRegistry(int portNumber) throws Exception
     {
         Registry registry = serverRegistry;
         if (registry == null)
@@ -456,5 +470,28 @@ public abstract class IndelibleServer implements EntityAuthenticationClientListe
         }
     }
 
+    public abstract File getAdditionalLoggingConfigFile(MonitoredProperties serverProperties);
 
+	public void checkAFUnixSocket(File socketFile, AFUNIXSocketAddress socketAddress)
+	{
+		if (socketFile.exists())
+		{
+			try
+			{
+				AFUNIXSocket.connectTo(socketAddress);
+				logger.fatal("Data mover socket "+socketFile+" active, another Executor must be running - exiting");
+				System.exit(0);
+			}
+			catch (IOException e)
+			{
+				// Closed, let's nuke it
+				socketFile.delete();
+			}
+		}
+	}
+	
+	public void dumpServer()
+	{
+		System.err.println("dumpServer called");
+	}
 }

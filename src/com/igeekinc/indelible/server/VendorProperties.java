@@ -49,7 +49,6 @@ public class VendorProperties {
     public static final String kGUIAppNamePropertyName="com.igeekinc.indelible.guiAppName"; //$NON-NLS-1$
     public static final String kSplashScreenResourceNamePropertyName = "com.igeekinc.indelible.splashScreenResourceName";
     public static final String kAboutBoxResourceNamePropertyName = "com.igeekinc.indelible.aboutBoxResourceName";
-    
     /**
 	 * 
 	 */

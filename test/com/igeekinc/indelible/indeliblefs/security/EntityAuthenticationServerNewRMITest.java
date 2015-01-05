@@ -18,7 +18,6 @@ package com.igeekinc.indelible.indeliblefs.security;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
@@ -46,6 +45,7 @@ import org.bouncycastle.jce.PKCS10CertificationRequest;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
 import org.newsclub.net.unix.AFUNIXSocketAddress;
 
+import com.igeekinc.firehose.AddressFilter;
 import com.igeekinc.indelible.indeliblefs.IndelibleEntity;
 import com.igeekinc.indelible.oid.EntityID;
 import com.igeekinc.indelible.oid.GeneratorID;
@@ -129,9 +129,17 @@ public class EntityAuthenticationServerNewRMITest extends iGeekTestCase
 
 	}
 	
-	public SocketAddress getTCPConnectAddress() throws UnknownHostException
+	public SocketAddress getTCPConnectAddress()
 	{
-		InetSocketAddress returnAddress = new InetSocketAddress(InetAddress.getByName("localhost"), tcpServer.getServerPort());
+		InetSocketAddress returnAddress = tcpServer.getListenAddresses(new AddressFilter()
+		{
+			
+			@Override
+			public boolean add(InetSocketAddress checkAddress)
+			{
+				return (!(checkAddress instanceof AFUNIXSocketAddress));
+			}
+		})[0];
 		return returnAddress;
 	}
 	
@@ -167,7 +175,7 @@ public class EntityAuthenticationServerNewRMITest extends iGeekTestCase
         
 	}
 	
-	public void testAuthenticateServer() throws UnknownHostException, IOException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, SignatureException, CertificateEncodingException, UnrecoverableKeyException, CertificateParsingException, IllegalStateException, KeyStoreException
+	public void testAuthenticateServer() throws UnknownHostException, IOException, InvalidKeyException, NoSuchAlgorithmException, NoSuchProviderException, SignatureException, CertificateEncodingException, UnrecoverableKeyException, CertificateParsingException, IllegalStateException, KeyStoreException, AuthenticationFailureException, ServerNotRegisteredException
 	{
 		SocketAddress tcpConnectAddress = getTCPConnectAddress();
 		doTestAuthenticateServer(tcpConnectAddress);
@@ -179,7 +187,7 @@ public class EntityAuthenticationServerNewRMITest extends iGeekTestCase
 			throws IOException, NoSuchAlgorithmException,
 			NoSuchProviderException, InvalidKeyException, SignatureException,
 			CertificateEncodingException, UnrecoverableKeyException,
-			KeyStoreException, RemoteException, CertificateParsingException
+			KeyStoreException, RemoteException, CertificateParsingException, IllegalStateException, AuthenticationFailureException, ServerNotRegisteredException
 	{
 		EntityAuthenticationServerFirehoseClient client = new EntityAuthenticationServerFirehoseClient(tcpConnectAddress);
 		try

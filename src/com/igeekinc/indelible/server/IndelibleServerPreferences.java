@@ -33,6 +33,8 @@ public class IndelibleServerPreferences extends PreferencesManager
     public static final String kEntityAuthenticationServerWasConfigured = "indelible.server.properties.entityAuthenticationServerWasConfigured";
     public static final String kLogFileDirectoryPropertyName = "indelible.server.LogFileDirectory"; //$NON-NLS-1$
     public static final String kRegistryPortPropertyName = "indelible.server.RegistryPort"; //$NON-NLS-1$
+    public static final String kMoverPortPropertyName = "indelible.server.MoverPort";	//$NON-NLS-1$
+    public static final String kLocalPortDirectory = "indelible.server.LocalPortDirectory";	//$NON-NLS-1$
 	public static final String kServerPortPropertyName = "com.igeekinc.indelible.server.ServerPort";
     public static final String kIndelibleFSCASDBURLPropertyName = "indelible.server.properties.casDBURL";
     public static final String kIndelibleFSCASDBUserPropertyName = "indelible.server.properties.casDBUser";
@@ -42,7 +44,8 @@ public class IndelibleServerPreferences extends PreferencesManager
 	public static final String kVerboseLogFileLevelPropertyName = "com.igeekinc.indelible.client.VerboseLogFileLevel"; //$NON-NLS-1$
 	public static final String kPurgeLogFilesAutomaticallyPropertyName = "com.igeekinc.indelible.client.PurgeLogFilesAutomatically"; //$NON-NLS-1$
 	public static final String kDaysToRetainLogFilesPropertyName = "com.igeekinc.indelible.client.DaysToRetainLogFiles"; //$NON-NLS-1$
-    public static final String kEnablePerformanceLogging = "com.igeekinc.indelible.server.EnablePerformanceLogging";
+    public static final String kEnablePerformanceLogging = "com.igeekinc.indelible.server.EnablePerformanceLogging";	//$NON-NLS-1$
+    public static final String kAdvertiseMoverAddressesPropertyName = "com.igeekinc.indelible.server.advertiseMoverAddresses";	//$NON-NLS-1$
 	public static final String kPreferencesDirName = VendorProperties.getPropertyDirName();
     public static final String kLogDirName = "indelibleFSLogs";
     public static final String kJavaRMIServerHostname="java.rmi.server.hostname";
@@ -63,6 +66,9 @@ public class IndelibleServerPreferences extends PreferencesManager
         File preferencesDir = getPreferencesDir();
         Properties defaults = new Properties();
         defaults.setProperty(kLogFileDirectoryPropertyName, new File(SystemInfo.getSystemInfo().getLogDirectory(), kLogDirName).getAbsolutePath()); //$NON-NLS-1$
+        defaults.setProperty(kMoverPortPropertyName, "50903");
+        File localSocketDefault = new File(SystemInfo.getSystemInfo().getTemporaryDirectory(), "indelible-fs");
+        defaults.setProperty(kLocalPortDirectory, localSocketDefault.getAbsolutePath());
         properties = new MonitoredProperties(defaults, dispatcher);
         setIfNotSet(kPreferencesDirPropertyName, preferencesDir.getAbsolutePath()); //$NON-NLS-1$
         setIfNotSet(kIndelibleFSCASDBURLPropertyName, "jdbc:postgresql://localhost/castest");
