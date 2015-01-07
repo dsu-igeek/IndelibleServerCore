@@ -97,4 +97,10 @@ public class IndelibleServerPreferences extends PreferencesManager
 	{
 		return new File(SystemInfo.getSystemInfo().getGlobalPreferencesDirectory(), kPreferencesDirName);
 	}
+	
+	@Override
+	protected File getUserPreferencesDirInternal()
+	{
+		return new File(SystemInfo.getSystemInfo().getUserPreferencesDirectory(), kPreferencesDirName);
+	}
 }
